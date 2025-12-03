@@ -14,13 +14,18 @@ class Product extends Model
         'name',
         'description',
         'price',
+        'currency',
+        'rating',
+        'review_count',
         'stock_quantity',
-        'image_url',
+        'image_filename',
         'is_available',
     ];
 
     protected $casts = [
         'is_available' => 'boolean',
+        'price' => 'float',
+        'rating' => 'float',
     ];
 
     public function category()

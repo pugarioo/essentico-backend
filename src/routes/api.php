@@ -6,6 +6,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderItemController;
+use App\Http\Controllers\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +33,10 @@ Route::apiResource('orders', OrderController::class);
 
 // Order Item routes
 Route::apiResource('order-items', OrderItemController::class);
+
+// Auth routes
+Route::post('login', [AuthController::class, 'login']);
+Route::post('logout', [AuthController::class, 'logout']);
 
 /*
 |--------------------------------------------------------------------------

@@ -13,12 +13,17 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('category_id')->constrained('categories')->onDelete('cascade');
+            // Assuming you have a categories table. If not, change this to $table->string('category');
+            $table->foreignId('category_id')->nullable(); 
+            
             $table->string('name');
             $table->text('description')->nullable();
             $table->decimal('price', 10, 2);
-            $table->integer('stock_quantity')->default(0);
-            $table->string('image_url')->nullable();
+            $table->string('currency', 3)->default('₱'); // Fits your JSON currency
+            $table->decimal('rating', 3, 1)->default(0);
+            $table->integer('review_count')->default(0);
+            $table->integer('stock_quantity')->default(100); // Default since JSON doesn't have stock
+            $table->string('image_filename')->nullable();
             $table->boolean('is_available')->default(true);
             $table->timestamps();
         });

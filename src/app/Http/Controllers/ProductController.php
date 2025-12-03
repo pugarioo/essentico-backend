@@ -18,9 +18,15 @@ class ProductController extends Controller
             return [
                 'id' => $product->id,
                 'name' => $product->name,
+                'description' => $product->description,
                 'price' => $product->price,
-                // Manually grabbing the name from the relation
-                'category' => $product->category ? $product->category->name : 'Uncategorized', 
+                'currency' => $product->currency,
+                'rating' => $product->rating,
+                'review_count' => $product->review_count,
+                'stock_quantity' => $product->stock_quantity,
+                'image_filename' => $product->image_filename,
+                'is_available' => $product->is_available,
+                'category' => $product->category ? $product->category->category_name : 'Uncategorized', 
             ];
         });
 
