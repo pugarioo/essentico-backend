@@ -52,9 +52,17 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'stock_quantity' => 'required|integer|min:0',
-            'image_url' => 'nullable|string|max:255',
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif',
             'is_available' => 'sometimes|boolean',
         ]);
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('products', 'public');
+
+            $filename = basename($path);
+            $validated['image_filename'] = $filename;
+            unset($validated['image']);
+        }
 
         $product = Product::create($validated);
         $product->load('category');
