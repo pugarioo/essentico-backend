@@ -38,7 +38,6 @@ class UserController extends Controller
             'role' => 'sometimes|string|in:customer,admin',
             'phone' => 'sometimes|string|max:255',
             'address' => 'sometimes|string|max:255',
-            'image_filename' => 'sometimes|string|max:255',
         ]);
 
         $user = User::create([
@@ -46,9 +45,8 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),   
             'role' => 'customer', 
-            'phone' => $validated['phone'],
-            'address' => $validated['address'],
-            'image_filename' => $validated['image_filename'],
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
         ]);
         return response()->json($user, 201);
     }
