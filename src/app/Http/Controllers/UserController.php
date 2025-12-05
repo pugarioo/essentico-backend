@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
@@ -35,6 +36,9 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'role' => 'sometimes|string|in:customer,admin',
+            'phone' => 'sometimes|string|max:255',
+            'address' => 'sometimes|string|max:255',
+            'image_filename' => 'sometimes|string|max:255',
         ]);
 
         $user = User::create([
@@ -42,6 +46,9 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),   
             'role' => 'customer', 
+            'phone' => $validated['phone'],
+            'address' => $validated['address'],
+            'image_filename' => $validated['image_filename'],
         ]);
         return response()->json($user, 201);
     }
@@ -73,10 +80,42 @@ class UserController extends Controller
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
             'password' => 'sometimes|required|string|min:8',
             'role' => 'sometimes|string|in:customer,admin',
+            'phone' => 'sometimes|nullable|string|max:255',
+            'address' => 'sometimes|nullable|string|max:255',
+            'image' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048', // max 2MB
         ]);
 
+        // Handle image upload if present
+        if ($request->hasFile('image')) {
+            // Delete old image if it exists
+            if ($user->image_filename) {
+                Storage::disk('public')->delete('users/' . $user->image_filename);
+            }
+
+            // Store new image
+            $path = $request->file('image')->store('users', 'public');
+            $validated['image_filename'] = basename($path);
+        }
+
+        // Hash password if provided
+        if (isset($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        }
+
+        // Remove 'image' from validated array since we've already processed it
+        unset($validated['image']);
+
         $user->update($validated);
+        
         return response()->json($user);
+    }
+
+    /**
+     * Update the currently authenticated user.
+     */
+    public function updateCurrent(Request $request)
+    {
+        return $this->update($request, $request->user());
     }
 
     /**
