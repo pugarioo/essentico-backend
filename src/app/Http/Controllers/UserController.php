@@ -71,7 +71,7 @@ class UserController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    
+    // comiit test
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
@@ -114,7 +114,99 @@ class UserController extends Controller
      */
     public function updateCurrent(Request $request)
     {
-        return $this->update($request, $request->user());
+        try {
+            $user = $request->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            // Build update data array
+            $updateData = [];
+
+            // Handle name
+            if ($request->has('name') && $request->input('name')) {
+                $request->validate(['name' => 'required|string|max:255']);
+                $updateData['name'] = $request->input('name');
+            }
+
+            // Handle email
+            if ($request->has('email') && $request->input('email')) {
+                $request->validate(['email' => 'required|string|email|max:255|unique:users,email,' . $user->id]);
+                $updateData['email'] = $request->input('email');
+            }
+
+            // Handle password
+            if ($request->has('password') && $request->input('password')) {
+                $request->validate(['password' => 'required|string|min:8']);
+                $updateData['password'] = Hash::make($request->input('password'));
+            }
+
+            // Handle phone
+            if ($request->has('phone')) {
+                $request->validate(['phone' => 'nullable|string|max:255']);
+                $updateData['phone'] = $request->input('phone') ?: null;
+            }
+
+            // Handle address
+            if ($request->has('address')) {
+                $request->validate(['address' => 'nullable|string|max:255']);
+                $updateData['address'] = $request->input('address') ?: null;
+            }
+
+            // Handle image upload
+            if ($request->hasFile('image')) {
+                // Validate image
+                $request->validate([
+                    'image' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
+                ]);
+
+                // Ensure directory exists
+                $usersPath = storage_path('app/public/users');
+                if (!is_dir($usersPath)) {
+                    mkdir($usersPath, 0755, true);
+                }
+
+                // Delete old image if exists
+                if ($user->image_filename) {
+                    $oldImagePath = storage_path('app/public/users/' . $user->image_filename);
+                    if (file_exists($oldImagePath)) {
+                        unlink($oldImagePath);
+                    }
+                }
+
+                // Store new image
+                $file = $request->file('image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                $file->move($usersPath, $filename);
+                
+                $updateData['image_filename'] = $filename;
+            }
+
+            // Only update if there's data to update
+            if (!empty($updateData)) {
+                $user->update($updateData);
+                $user->refresh();
+            }
+
+            return response()->json([
+                'message' => 'User updated successfully',
+                'user' => $user
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while updating the user',
+                'error' => config('app.debug') ? $e->getMessage() : 'Please try again later'
+            ], 500);
+        }
     }
 
     /**
