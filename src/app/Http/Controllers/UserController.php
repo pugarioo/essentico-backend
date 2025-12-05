@@ -71,7 +71,7 @@ class UserController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    // comiit test
+    
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
