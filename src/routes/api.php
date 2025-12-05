@@ -41,8 +41,10 @@ Route::post('login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('user', [AuthController::class, 'user']);
-    Route::match(['put', 'post'], 'user', [UserController::class, 'updateCurrent']); // Accept both PUT and POST
+    Route::put('user', [UserController::class, 'updateCurrent']); // Add this
 });
+
+//test
 
 /*
 |--------------------------------------------------------------------------
