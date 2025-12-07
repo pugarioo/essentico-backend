@@ -6,6 +6,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -31,24 +33,51 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-            'role' => 'sometimes|string|in:customer,admin',
-            'phone' => 'sometimes|string|max:255',
-            'address' => 'sometimes|string|max:255',
-        ]);
+        try {
+            // 1. Validate
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users,email',
+                'password' => 'required|string|min:8',
+                'role' => 'sometimes|string|in:customer,admin',
+                'phone' => 'sometimes|string|max:255',
+                'address' => 'sometimes|string|max:255',
+                'image_filename' => 'sometimes|string|max:255',
+            ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),   
-            'role' => 'customer', 
-            'phone' => $validated['phone'] ?? null,
-            'address' => $validated['address'] ?? null,
-        ]);
-        return response()->json($user, 201);
+            // 2. Setup the data - EXPLICITLY get role from request
+            $userData = [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => $request->input('role', 'customer'), // Get directly from request
+                'phone' => $validated['phone'] ?? null,
+                'address' => $validated['address'] ?? null,
+                'image_filename' => $validated['image_filename'] ?? null,
+            ];
+
+            // 3. Create
+            $user = User::create($userData);
+
+            return response()->json($user, 201);
+
+        } catch (ValidationException $e) {
+            // Handle validation errors (including duplicate email)
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (QueryException $e) {
+            // Handle database errors (fallback for duplicate entries)
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19 || str_contains($e->getMessage(), 'Duplicate entry')) {
+                return response()->json([
+                    'message' => 'The email has already been taken.',
+                    'errors' => ['email' => ['The email has already been taken.']]
+                ], 422);
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -71,7 +100,6 @@ class UserController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    // comiit test
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
@@ -114,99 +142,7 @@ class UserController extends Controller
      */
     public function updateCurrent(Request $request)
     {
-        try {
-            $user = $request->user();
-            
-            if (!$user) {
-                return response()->json([
-                    'message' => 'User not authenticated'
-                ], 401);
-            }
-
-            // Build update data array
-            $updateData = [];
-
-            // Handle name
-            if ($request->has('name') && $request->input('name')) {
-                $request->validate(['name' => 'required|string|max:255']);
-                $updateData['name'] = $request->input('name');
-            }
-
-            // Handle email
-            if ($request->has('email') && $request->input('email')) {
-                $request->validate(['email' => 'required|string|email|max:255|unique:users,email,' . $user->id]);
-                $updateData['email'] = $request->input('email');
-            }
-
-            // Handle password
-            if ($request->has('password') && $request->input('password')) {
-                $request->validate(['password' => 'required|string|min:8']);
-                $updateData['password'] = Hash::make($request->input('password'));
-            }
-
-            // Handle phone
-            if ($request->has('phone')) {
-                $request->validate(['phone' => 'nullable|string|max:255']);
-                $updateData['phone'] = $request->input('phone') ?: null;
-            }
-
-            // Handle address
-            if ($request->has('address')) {
-                $request->validate(['address' => 'nullable|string|max:255']);
-                $updateData['address'] = $request->input('address') ?: null;
-            }
-
-            // Handle image upload
-            if ($request->hasFile('image')) {
-                // Validate image
-                $request->validate([
-                    'image' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
-                ]);
-
-                // Ensure directory exists
-                $usersPath = storage_path('app/public/users');
-                if (!is_dir($usersPath)) {
-                    mkdir($usersPath, 0755, true);
-                }
-
-                // Delete old image if exists
-                if ($user->image_filename) {
-                    $oldImagePath = storage_path('app/public/users/' . $user->image_filename);
-                    if (file_exists($oldImagePath)) {
-                        unlink($oldImagePath);
-                    }
-                }
-
-                // Store new image
-                $file = $request->file('image');
-                $filename = time() . '_' . $file->getClientOriginalName();
-                $file->move($usersPath, $filename);
-                
-                $updateData['image_filename'] = $filename;
-            }
-
-            // Only update if there's data to update
-            if (!empty($updateData)) {
-                $user->update($updateData);
-                $user->refresh();
-            }
-
-            return response()->json([
-                'message' => 'User updated successfully',
-                'user' => $user
-            ], 200);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'An error occurred while updating the user',
-                'error' => config('app.debug') ? $e->getMessage() : 'Please try again later'
-            ], 500);
-        }
+        return $this->update($request, $request->user());
     }
 
     /**

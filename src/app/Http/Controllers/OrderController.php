@@ -30,7 +30,7 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => 'required|uuid|exists:users,id',
             'total_amount' => 'required|numeric|min:0',
             'status' => 'sometimes|string|in:pending,processing,completed,cancelled',
             'payment_method' => 'nullable|string|max:255',
@@ -68,7 +68,7 @@ class OrderController extends Controller
     public function update(Request $request, Order $order)
     {
         $validated = $request->validate([
-            'user_id' => 'sometimes|required|exists:users,id',
+            'user_id' => 'sometimes|required|uuid|exists:users,id',
             'total_amount' => 'sometimes|required|numeric|min:0',
             'status' => 'sometimes|string|in:pending,processing,completed,cancelled',
             'payment_method' => 'sometimes|nullable|string|max:255',

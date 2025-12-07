@@ -12,7 +12,10 @@ class ProductController extends Controller
      */
     public function index()
     {
-        $products = Product::with('category')->get();
+        $products = Product::with('category')
+            ->withAvg('ratings', 'rating')
+            ->withCount('ratings')
+            ->get();
 
         $formattedProducts = $products->map(function ($product) {
             return [
@@ -21,8 +24,8 @@ class ProductController extends Controller
                 'description' => $product->description,
                 'price' => $product->price,
                 'currency' => $product->currency,
-                'rating' => $product->rating,
-                'review_count' => $product->review_count,
+                'rating' => $product->ratings_avg_rating ? round($product->ratings_avg_rating, 1) : 0,
+                'ratings_count' => $product->ratings_count ?? 0,
                 'stock_quantity' => $product->stock_quantity,
                 'image_filename' => $product->image_filename,
                 'is_available' => $product->is_available,
@@ -76,7 +79,15 @@ class ProductController extends Controller
     public function show(Product $product)
     {
         $product->load('category');
-        return response()->json($product);
+        $product->loadAvg('ratings', 'rating');
+        $product->loadCount('ratings');
+        
+        // Add calculated rating to the response
+        $productData = $product->toArray();
+        $productData['rating'] = $product->ratings_avg_rating ? round($product->ratings_avg_rating, 1) : 0;
+        $productData['ratings_count'] = $product->ratings_count ?? 0;
+        
+        return response()->json($productData);
     }
 
     /**

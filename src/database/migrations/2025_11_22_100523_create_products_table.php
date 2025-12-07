@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             // Assuming you have a categories table. If not, change this to $table->string('category');
             $table->foreignId('category_id')->nullable(); 
             
