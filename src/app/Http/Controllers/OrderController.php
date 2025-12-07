@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\OrderItem;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -29,20 +31,61 @@ class OrderController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'user_id' => 'required|uuid|exists:users,id',
-            'total_amount' => 'required|numeric|min:0',
-            'status' => 'sometimes|string|in:pending,processing,completed,cancelled',
-            'payment_method' => 'nullable|string|max:255',
-            'delivery_method' => 'nullable|string|max:255',
-            'delivery_address' => 'nullable|string',
-            'ordered_at' => 'nullable|date',
-        ]);
+        try {
+            $validated = $request->validate([
+                'user_id' => 'required|uuid|exists:users,id',
+                'items' => 'required|array|min:1',
+                'items.*.quantity' => 'required|integer|min:1',
+                'items.*.details' => 'required|array',
+                'items.*.details.id' => 'required|uuid|exists:products,id',
+                'items.*.details.price' => 'required|numeric|min:0',
+                'total_amount' => 'required|numeric|min:0',
+                'status' => 'sometimes|string|in:pending,processing,completed,cancelled',
+                'payment_method' => 'nullable|string|max:255',
+                'delivery_method' => 'nullable|string|max:255',
+                'delivery_address' => 'nullable|string',
+                'ordered_at' => 'nullable|date',
+            ]);
 
-        $order = Order::create($validated);
-        $order->load(['user', 'orderItems.product']);
-        
-        return response()->json($order, 201);
+            // Create the order
+            $orderData = [
+                'user_id' => $validated['user_id'],
+                'total_amount' => $validated['total_amount'],
+                'status' => $validated['status'] ?? 'pending',
+                'payment_method' => $validated['payment_method'] ?? null,
+                'delivery_method' => $validated['delivery_method'] ?? null,
+                'delivery_address' => $validated['delivery_address'] ?? null,
+                'ordered_at' => $validated['ordered_at'] ?? now(),
+            ];
+
+            $order = Order::create($orderData);
+
+            // Create order items from the items array
+            // Structure: items[].quantity and items[].details.id (product_id), items[].details.price
+            foreach ($validated['items'] as $item) {
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $item['details']['id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['details']['price'],
+                ]);
+            }
+
+            // Load relationships and return
+            $order->load(['user', 'orderItems.product']);
+            
+            return response()->json($order, 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while creating the order',
+                'error' => config('app.debug') ? $e->getMessage() : 'Please try again later'
+            ], 500);
+        }
     }
 
     /**
