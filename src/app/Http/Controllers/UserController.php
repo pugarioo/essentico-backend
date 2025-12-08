@@ -16,7 +16,8 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = User::all();
+        // Return full user details plus a total_orders count
+        $users = User::withCount(['orders as total_orders'])->get();
         return response()->json($users);
     }
 
