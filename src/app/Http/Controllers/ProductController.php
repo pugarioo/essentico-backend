@@ -51,28 +51,99 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'stock_quantity' => 'required|integer|min:0',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif',
-            'is_available' => 'sometimes|boolean',
-        ]);
+        try {
+            // Check for file BEFORE validation
+            $hasFile = $request->hasFile('image');
+            $file = $request->file('image');
+            $allFiles = $request->allFiles();
+            
+            // If file exists in allFiles but not detected by hasFile, use it
+            if (!$hasFile && isset($allFiles['image'])) {
+                $file = $allFiles['image'];
+                $hasFile = true;
+            }
+            
+            $validated = $request->validate([
+                'category_id' => 'required|exists:categories,id',
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'price' => 'required|numeric|min:0',
+                'stock_quantity' => 'required|integer|min:0',
+                'image' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+                'is_available' => 'sometimes|nullable',
+            ]);
 
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
+            // Handle image upload
+            if ($hasFile && $file) {
+                try {
+                    // Validate file is actually an image
+                    if (!$file->isValid()) {
+                        $errorMessages = [
+                            UPLOAD_ERR_INI_SIZE => 'The file exceeds the upload_max_filesize directive (2MB)',
+                            UPLOAD_ERR_FORM_SIZE => 'The file exceeds the MAX_FILE_SIZE directive',
+                            UPLOAD_ERR_PARTIAL => 'The file was only partially uploaded',
+                            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+                            UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder',
+                            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+                            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload',
+                        ];
+                        
+                        $errorCode = $file->getError();
+                        $errorMessage = $errorMessages[$errorCode] ?? 'Unknown upload error (code: ' . $errorCode . ')';
+                        
+                        return response()->json([
+                            'message' => 'Invalid file uploaded',
+                            'errors' => ['image' => [$errorMessage]]
+                        ], 422);
+                    }
 
-            $filename = basename($path);
-            $validated['image_filename'] = $filename;
-            unset($validated['image']);
+                    $path = $file->store('products', 'public');
+                    $filename = basename($path);
+                    $validated['image_filename'] = $filename;
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'message' => 'Failed to upload image',
+                        'error' => config('app.debug') ? $e->getMessage() : 'Please try again later'
+                    ], 500);
+                }
+            }
+
+            // Convert is_available from string '1'/'0' to boolean
+            if (isset($validated['is_available'])) {
+                $validated['is_available'] = filter_var($validated['is_available'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($validated['is_available'] === null) {
+                    // If it's a string '1' or '0', convert it
+                    $validated['is_available'] = in_array(strtolower($validated['is_available']), ['1', 'true', 'yes', 'on']);
+                }
+            }
+
+            // Remove 'image' from validated array since we've already processed it
+            if (isset($validated['image'])) {
+                unset($validated['image']);
+            }
+
+            $product = Product::create($validated);
+            $product->load('category');
+            $product->loadAvg('ratings', 'rating');
+            $product->loadCount('ratings');
+            
+            // Add calculated rating to the response
+            $productData = $product->toArray();
+            $productData['rating'] = $product->ratings_avg_rating ? round($product->ratings_avg_rating, 1) : 0;
+            $productData['ratings_count'] = $product->ratings_count ?? 0;
+
+            return response()->json($productData, 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while creating the product',
+                'error' => config('app.debug') ? $e->getMessage() : 'Please try again later'
+            ], 500);
         }
-
-        $product = Product::create($validated);
-        $product->load('category');
-
-        return response()->json($product, 201);
     }
 
     /**

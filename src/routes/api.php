@@ -7,6 +7,8 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderItemController;
 use App\Http\Controllers\CartItemController;
+use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\RatingController;
 use App\Http\Controllers\AuthController;
 
 /*
@@ -32,12 +34,17 @@ Route::apiResource('categories', CategoryController::class);
 Route::apiResource('products', ProductController::class);
 // Allow POST for product updates (for FormData compatibility)
 Route::post('products/{product}', [ProductController::class, 'update'])->name('products.update.post');
+// Get product ratings (public)
+Route::get('products/{product}/ratings', [RatingController::class, 'getProductRatings']);
 
 // Order routes
 Route::apiResource('orders', OrderController::class);
 
 // Order Item routes
 Route::apiResource('order-items', OrderItemController::class);
+
+// Discount routes
+Route::apiResource('discounts', DiscountController::class);
 
 // Auth routes (public)
 Route::post('admin/login', [AuthController::class, 'adminLogin']);
@@ -54,5 +61,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('cart', [CartItemController::class, 'store']);
     Route::put('cart/{cartItem}', [CartItemController::class, 'update']);
     Route::delete('cart/{cartItem}', [CartItemController::class, 'destroy']);
+    
+    // Rating routes (authenticated users)
+    Route::get('ratings/check', [RatingController::class, 'checkRating']);
+    Route::post('ratings', [RatingController::class, 'store']);
+    
+    // Admin rating routes
+    Route::get('admin/ratings', [RatingController::class, 'adminIndex']);
+    Route::delete('admin/ratings/{rating}', [RatingController::class, 'adminDestroy']);
 });
 

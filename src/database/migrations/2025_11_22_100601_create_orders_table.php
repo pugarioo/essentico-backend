@@ -16,7 +16,9 @@ return new class extends Migration
             $table->uuid('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->decimal('total_amount', 10, 2);
-            $table->string('status')->default('pending');
+            $table->string('discount_code')->nullable();
+            $table->decimal('discount_value', 5, 2)->nullable(); // Percentage: e.g., 10.00 for 10%
+            $table->enum('status', ['pending', 'processing', 'shipped', 'delivered', 'cancelled'])->default('pending');
             $table->string('payment_method')->nullable();
             $table->string('delivery_method')->nullable();
             $table->text('delivery_address')->nullable();

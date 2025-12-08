@@ -13,10 +13,17 @@ return new class extends Migration
     {
         Schema::create('ratings', function (Blueprint $table) {
             $table->id();
+            $table->uuid('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->uuid('product_id');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
-            $table->integer('rating');
+            $table->unsignedBigInteger('order_id');
+            $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
+            $table->integer('rating'); // 1-5
             $table->timestamps();
+            
+            // Prevent duplicate ratings per product per order
+            $table->unique(['user_id', 'product_id', 'order_id']);
         });
     }
 
